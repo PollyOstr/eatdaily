@@ -430,6 +430,7 @@ details.wday[open] > summary::after{transform:rotate(-135deg)}
 <script>
 (function(){
 'use strict';
+const SEND_URL = 'https://eatdaily-bot.vasyukova-polina.workers.dev/send';
 const TGA = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
 const tgV = v => !!(TGA && TGA.isVersionAtLeast && TGA.isVersionAtLeast(v));
 const D = JSON.parse(document.getElementById('data').textContent);
@@ -865,7 +866,7 @@ function renderDay(){
           <div><span>Уже есть дома</span><span>${got}</span></div>
           <div class="grand"><span>Осталось купить, со специями</span><span>${total - got}</span></div>
         </div>
-        <div class="rc-foot"><p>Отметьте галочкой то, что уже есть дома. Специи и масло тоже в списке, чтобы ничего не забыть.</p><span class="dr-actions">${TGA ? '<button type="button" class="btn small primary" id="shareList">Отправить в чат</button>' : ''}<button type="button" class="btn small" id="copyList">Скопировать список</button></span></div>
+        <div class="rc-foot"><p>Отметьте галочкой то, что уже есть дома. Специи и масло тоже в списке, чтобы ничего не забыть.</p><span class="dr-actions">${TGA ? '<button type="button" class="btn small primary" id="shareList">Прислать в чат с ботом</button>' : ''}<button type="button" class="btn small" id="copyList">Скопировать список</button></span></div>
         <div id="copyFallback"></div>
       </section>
     </div>
@@ -1447,7 +1448,7 @@ function renderWeek(){
           <div><span>Уже есть дома</span><span>${got}</span></div>
           <div class="grand"><span>Осталось купить, со специями</span><span>${total - got}</span></div>
         </div>
-        <div class="rc-foot"><p>Отметьте галочкой то, что уже есть дома.</p><span class="dr-actions">${TGA ? '<button type="button" class="btn small primary" id="shareList">Отправить в чат</button>' : ''}<button type="button" class="btn small" id="copyList">Скопировать список</button></span></div>
+        <div class="rc-foot"><p>Отметьте галочкой то, что уже есть дома.</p><span class="dr-actions">${TGA ? '<button type="button" class="btn small primary" id="shareList">Прислать в чат с ботом</button>' : ''}<button type="button" class="btn small" id="copyList">Скопировать список</button></span></div>
         <div id="copyFallback"></div>
       </section>
     </div>
@@ -1528,7 +1529,16 @@ document.addEventListener('click', e => {
   if (el.id === 'setBtn') return openSet();
   if (d.tstep){ setTarget(S.target + +d.tstep); return; }
   if (d.open){ return ({calc: openCalc, macro: openMacro, ex: openEx, eaters: openEaters})[d.open](); }
-  if (el.id === 'shareList'){ const txt = listText(); try { TGA.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(txt)); } catch (e) { toast('Не получилось открыть отправку, скопируйте список'); } return; }
+  if (el.id === 'shareList'){
+    if (el.disabled) return;
+    const txt = listText(), fail = () => { el.disabled = false; toast('Не получилось отправить, скопируйте список'); };
+    el.disabled = true;
+    try {
+      fetch(SEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({initData: TGA.initData, text: txt})})
+        .then(r => { if (!r.ok) return fail(); el.disabled = false; toast('Список в чате с ботом, его можно переслать'); try { TGA.HapticFeedback.notificationOccurred('success'); } catch (e) {} }, fail);
+    } catch (e) { fail(); }
+    return;
+  }
   if (el.id === 'macroBtn') return openMacro();
   if (el.id === 'exBtn') return openEx();
   if (el.id === 'calcBtn') return openCalc();
